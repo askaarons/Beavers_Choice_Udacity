@@ -21,7 +21,8 @@ REQUIRED_COLUMNS = {
 
 
 def test_evaluation_contract(tmp_path: Path) -> None:
-    input_csv = Path("quote_requests_sample.csv")
+    repo_root = Path(__file__).resolve().parents[1]
+    input_csv = repo_root / "quote_requests_sample.csv"
     output_csv = tmp_path / "test_results.csv"
 
     results = run_evaluation(str(input_csv), str(output_csv))
