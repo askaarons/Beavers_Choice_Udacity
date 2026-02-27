@@ -1,0 +1,9 @@
+request_id,customer_name,paper_type,quantity,max_budget,needed_by
+R-001,Acme Print Shop,matte_a4,60,160,2026-03-08
+R-002,North Valley School,recycled_a4,120,320,2026-03-10
+R-003,Beacon Design,cardstock_a3,150,750,2026-03-15
+R-004,Bluebird Events,glossy_a4,260,650,2026-03-20
+R-005,Acme Print Shop,matte_a4,420,900,2026-03-25
+R-006,City Council Office,unknown_type,50,200,2026-03-12
+R-007,QuickFlyers,glossy_a4,90,180,2026-03-05
+R-008,Studio Merge,cardstock_a3,50,120,2026-03-11
