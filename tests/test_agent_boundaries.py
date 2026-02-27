@@ -63,6 +63,7 @@ def test_agent_output_schemas_and_boundaries() -> None:
         "status",
         "fulfilled",
         "rationale",
-        "cash_balance_after",
         "framework",
     }.issubset(orchestrator_result.keys())
+    assert "cash_balance_after" not in orchestrator_result
+    assert "operator_cash_balance_after" not in orchestrator_result

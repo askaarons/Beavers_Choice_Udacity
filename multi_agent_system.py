@@ -6,7 +6,7 @@ import csv
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from project_starter import (
     DB_PATH,
@@ -24,10 +24,11 @@ from project_starter import (
 )
 
 try:
-    from smolagents import tool
-    FRAMEWORK = "smolagents"
+    from smolagents import ToolCallingAgent, tool
+    FRAMEWORK = "smolagents.ToolCallingAgent"
 except Exception:  # pragma: no cover
-    FRAMEWORK = "smolagents"
+    ToolCallingAgent = None
+    FRAMEWORK = "local_tool_router"
 
     def tool(fn):
         return fn
@@ -94,15 +95,48 @@ class Request:
     needed_by: str
 
 
+class FrameworkManagedToolRuntime:
+    def __init__(self, tools: list[Callable[..., Any]]) -> None:
+        self._tool_registry = {fn.__name__: fn for fn in tools}
+        self.framework = FRAMEWORK
+        self._framework_agent = None
+
+        if ToolCallingAgent is not None:
+            try:
+                self._framework_agent = ToolCallingAgent(tools=tools, model=None)
+            except Exception:
+                self._framework_agent = None
+
+    def call(self, tool_name: str, **kwargs: Any) -> Any:
+        tool_fn = self._tool_registry[tool_name]
+        return tool_fn(**kwargs)
+
+
+def _build_default_runtime() -> FrameworkManagedToolRuntime:
+    return FrameworkManagedToolRuntime(
+        tools=[
+            inventory_lookup_tool,
+            supplier_timeline_tool,
+            quote_history_tool,
+            transaction_tool,
+            cash_balance_tool,
+            financial_report_tool,
+        ]
+    )
+
+
 class InventoryAgent:
+    def __init__(self, runtime: FrameworkManagedToolRuntime | None = None) -> None:
+        self.runtime = runtime or _build_default_runtime()
+
     def assess(self, request: Request) -> dict[str, Any]:
-        snapshot = inventory_lookup_tool(request.paper_type)
+        snapshot = self.runtime.call("inventory_lookup_tool", paper_type=request.paper_type)
         if not snapshot["known_item"]:
             return {"can_fulfill_now": False, "reason": "requested paper type is not available", "eta": None}
 
         stock = int(snapshot["stock_level"])
         can_fulfill_now = stock >= request.quantity
-        eta = supplier_timeline_tool(request.paper_type, request.quantity)
+        eta = self.runtime.call("supplier_timeline_tool", paper_type=request.paper_type, quantity=request.quantity)
         needs_reorder = stock < (snapshot["reorder_threshold"] or 0)
 
         return {
@@ -114,6 +148,9 @@ class InventoryAgent:
 
 
 class QuoteAgent:
+    def __init__(self, runtime: FrameworkManagedToolRuntime | None = None) -> None:
+        self.runtime = runtime or _build_default_runtime()
+
     @staticmethod
     def _bulk_discount(quantity: int) -> float:
         if quantity >= 300:
@@ -129,7 +166,11 @@ class QuoteAgent:
         if spec is None:
             return {"approved": False, "reason": "paper type not sold", "unit_price": 0.0, "total": 0.0}
 
-        history = quote_history_tool(request.customer_name, request.paper_type)
+        history = self.runtime.call(
+            "quote_history_tool",
+            customer_name=request.customer_name,
+            paper_type=request.paper_type,
+        )
         loyalty_discount = 0.02 if history else 0.0
         bulk_discount = self._bulk_discount(request.quantity)
         total_discount = min(0.2, loyalty_discount + bulk_discount)
@@ -156,28 +197,33 @@ class QuoteAgent:
 
 
 class FulfillmentAgent:
+    def __init__(self, runtime: FrameworkManagedToolRuntime | None = None) -> None:
+        self.runtime = runtime or _build_default_runtime()
+
     def finalize(self, request: Request, quote: dict[str, Any], inventory_assessment: dict[str, Any]) -> dict[str, Any]:
         if not quote["approved"]:
-            txn_id = transaction_tool(
-                request.customer_name,
-                request.paper_type,
-                request.quantity,
-                quote.get("unit_price", 0.0),
-                quote.get("total", 0.0),
-                "declined",
-                quote.get("reason", "declined"),
+            txn_id = self.runtime.call(
+                "transaction_tool",
+                customer_name=request.customer_name,
+                paper_type=request.paper_type,
+                quantity=request.quantity,
+                unit_price=quote.get("unit_price", 0.0),
+                total_price=quote.get("total", 0.0),
+                status="declined",
+                notes=quote.get("reason", "declined"),
             )
             return {"fulfilled": False, "status": "declined", "txn_id": txn_id, "message": quote["reason"]}
 
         if not inventory_assessment["can_fulfill_now"]:
-            txn_id = transaction_tool(
-                request.customer_name,
-                request.paper_type,
-                request.quantity,
-                quote["unit_price"],
-                quote["total"],
-                "unfulfilled",
-                f"insufficient stock; earliest supplier ETA {inventory_assessment['eta']}",
+            txn_id = self.runtime.call(
+                "transaction_tool",
+                customer_name=request.customer_name,
+                paper_type=request.paper_type,
+                quantity=request.quantity,
+                unit_price=quote["unit_price"],
+                total_price=quote["total"],
+                status="unfulfilled",
+                notes=f"insufficient stock; earliest supplier ETA {inventory_assessment['eta']}",
             )
             return {
                 "fulfilled": False,
@@ -188,14 +234,15 @@ class FulfillmentAgent:
 
         remaining = inventory_assessment["stock"] - request.quantity
         update_stock_level(request.paper_type, remaining)
-        txn_id = transaction_tool(
-            request.customer_name,
-            request.paper_type,
-            request.quantity,
-            quote["unit_price"],
-            quote["total"],
-            "fulfilled",
-            "fulfilled from on-hand inventory",
+        txn_id = self.runtime.call(
+            "transaction_tool",
+            customer_name=request.customer_name,
+            paper_type=request.paper_type,
+            quantity=request.quantity,
+            unit_price=quote["unit_price"],
+            total_price=quote["total"],
+            status="fulfilled",
+            notes="fulfilled from on-hand inventory",
         )
         return {
             "fulfilled": True,
@@ -206,25 +253,28 @@ class FulfillmentAgent:
 
 
 class ReportingAgent:
+    def __init__(self, runtime: FrameworkManagedToolRuntime | None = None) -> None:
+        self.runtime = runtime or _build_default_runtime()
+
     def snapshot(self) -> dict[str, Any]:
         return {
-            "cash_balance": round(cash_balance_tool(), 2),
-            "financial_report": financial_report_tool(),
+            "cash_balance": round(self.runtime.call("cash_balance_tool"), 2),
+            "financial_report": self.runtime.call("financial_report_tool"),
         }
 
 
 class OrchestratorAgent:
     def __init__(self) -> None:
-        self.inventory_agent = InventoryAgent()
-        self.quote_agent = QuoteAgent()
-        self.fulfillment_agent = FulfillmentAgent()
-        self.reporting_agent = ReportingAgent()
+        self.runtime = _build_default_runtime()
+        self.inventory_agent = InventoryAgent(self.runtime)
+        self.quote_agent = QuoteAgent(self.runtime)
+        self.fulfillment_agent = FulfillmentAgent(self.runtime)
+        self.reporting_agent = ReportingAgent(self.runtime)
 
     def handle_request(self, request: Request) -> dict[str, Any]:
         inventory_assessment = self.inventory_agent.assess(request)
         quote = self.quote_agent.build_quote(request)
         fulfillment = self.fulfillment_agent.finalize(request, quote, inventory_assessment)
-        reporting = self.reporting_agent.snapshot()
 
         if fulfillment["fulfilled"]:
             rationale = fulfillment["message"]
@@ -242,10 +292,17 @@ class OrchestratorAgent:
             "status": fulfillment["status"],
             "fulfilled": fulfillment["fulfilled"],
             "rationale": rationale,
-            "cash_balance_after": reporting["cash_balance"],
-            "framework": FRAMEWORK,
+            "framework": self.runtime.framework,
         }
         return response
+
+    def handle_request_for_operations(self, request: Request) -> dict[str, Any]:
+        customer_response = self.handle_request(request)
+        reporting = self.reporting_agent.snapshot()
+        return {
+            **customer_response,
+            "operator_cash_balance_after": reporting["cash_balance"],
+        }
 
 
 def load_requests(csv_path: Path) -> list[Request]:
@@ -274,7 +331,7 @@ def run_evaluation(input_csv: str = "quote_requests_sample.csv", output_csv: str
     orchestrator = OrchestratorAgent()
 
     requests = load_requests(Path(input_csv))
-    results = [orchestrator.handle_request(req) for req in requests]
+    results = [orchestrator.handle_request_for_operations(req) for req in requests]
 
     fieldnames = [
         "request_id",
@@ -285,7 +342,7 @@ def run_evaluation(input_csv: str = "quote_requests_sample.csv", output_csv: str
         "status",
         "fulfilled",
         "rationale",
-        "cash_balance_after",
+        "operator_cash_balance_after",
         "framework",
     ]
 

@@ -15,7 +15,7 @@ REQUIRED_COLUMNS = {
     "status",
     "fulfilled",
     "rationale",
-    "cash_balance_after",
+    "operator_cash_balance_after",
     "framework",
 }
 
@@ -36,7 +36,7 @@ def test_evaluation_contract(tmp_path: Path) -> None:
     non_fulfilled_count = sum(1 for row in results if not bool(row["fulfilled"]))
     assert non_fulfilled_count >= 1
 
-    balances = [float(row["cash_balance_after"]) for row in results]
+    balances = [float(row["operator_cash_balance_after"]) for row in results]
     balance_changes = sum(1 for i in range(1, len(balances)) if balances[i] != balances[i - 1])
     assert balance_changes >= 2
     assert fulfilled_count >= 3

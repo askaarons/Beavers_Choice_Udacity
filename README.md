@@ -1,5 +1,5 @@
 # Beavers_Choice_Udacity
-Capstone - beavers choice
+Capstone - Beavers Choice
 
 ## Deliverables
 
@@ -19,10 +19,10 @@ Capstone - beavers choice
 	pip install -r requirements.txt
 	```
 
-	Optional (if available in your package index):
+	Optional (if available for your Python version in your package index):
 
 	```bash
-	pip install smolagents
+	pip install -r requirements-optional.txt
 	```
 
 2. Run evaluation:
@@ -36,6 +36,12 @@ Capstone - beavers choice
 	```bash
 	pytest -q
 	```
+
+## Output contracts
+
+- `OrchestratorAgent.handle_request(...)` returns a customer-safe response and does **not** expose internal cash metrics.
+- `OrchestratorAgent.handle_request_for_operations(...)` appends operator telemetry used for evaluation outputs.
+- `test_results.csv` includes `operator_cash_balance_after` (operator-only), not a customer-facing cash field.
 
 ## CI
 

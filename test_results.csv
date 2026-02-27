@@ -1,9 +1,9 @@
-request_id,customer_name,paper_type,quantity,quote_total,status,fulfilled,rationale,cash_balance_after,framework
-R-001,Acme Print Shop,matte_a4,60,144.0,fulfilled,True,order fulfilled and inventory updated,-1119.5,smolagents
-R-002,North Valley School,recycled_a4,120,298.8,fulfilled,True,order fulfilled and inventory updated,-634.7,smolagents
-R-003,Beacon Design,cardstock_a3,150,613.5,fulfilled,True,order fulfilled and inventory updated,391.3,smolagents
-R-004,Bluebird Events,glossy_a4,260,725.4,declined,False,quote exceeds stated budget ($650.00),391.3,smolagents
-R-005,Acme Print Shop,matte_a4,420,848.4,unfulfilled,False,insufficient stock now; next supplier ETA is 2026-03-07,391.3,smolagents
-R-006,City Council Office,unknown_type,50,0.0,declined,False,paper type not sold,391.3,smolagents
-R-007,QuickFlyers,glossy_a4,90,279.0,declined,False,quote exceeds stated budget ($180.00),391.3,smolagents
-R-008,Studio Merge,cardstock_a3,50,217.5,declined,False,quote exceeds stated budget ($120.00),391.3,smolagents
+request_id,customer_name,paper_type,quantity,quote_total,status,fulfilled,rationale,operator_cash_balance_after,framework
+R-001,Acme Print Shop,matte_a4,60,144.0,fulfilled,True,order fulfilled and inventory updated,-1119.5,local_tool_router
+R-002,North Valley School,recycled_a4,120,298.8,fulfilled,True,order fulfilled and inventory updated,-634.7,local_tool_router
+R-003,Beacon Design,cardstock_a3,150,613.5,fulfilled,True,order fulfilled and inventory updated,391.3,local_tool_router
+R-004,Bluebird Events,glossy_a4,260,725.4,declined,False,quote exceeds stated budget ($650.00),391.3,local_tool_router
+R-005,Acme Print Shop,matte_a4,420,848.4,unfulfilled,False,insufficient stock now; next supplier ETA is 2026-03-07,391.3,local_tool_router
+R-006,City Council Office,unknown_type,50,0.0,declined,False,paper type not sold,391.3,local_tool_router
+R-007,QuickFlyers,glossy_a4,90,279.0,declined,False,quote exceeds stated budget ($180.00),391.3,local_tool_router
+R-008,Studio Merge,cardstock_a3,50,217.5,declined,False,quote exceeds stated budget ($120.00),391.3,local_tool_router
